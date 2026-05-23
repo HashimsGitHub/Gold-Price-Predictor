@@ -9,8 +9,10 @@ A machine learning pipeline that forecasts gold prices using multi-asset correla
 This notebook fetches 10 years of monthly gold spot price data alongside correlated macro assets (USD Index, S&P 500, Silver) from Yahoo Finance, engineers time-series features, trains an XGBoost regression model, and stores predictions back into Supabase — refreshing actuals on every run for ongoing monitoring.
 
 ---
-<img width="1563" height="766" alt="image" src="https://github.com/user-attachments/assets/23867677-20af-43ed-a7bb-3bf1db4b9f71" />
-<img width="908" height="775" alt="image" src="https://github.com/user-attachments/assets/feed0614-9bf3-4127-90f9-0e5c00a65ce0" />
+<img width="1397" height="704" alt="image" src="https://github.com/user-attachments/assets/9da9af46-cf15-44f9-8851-9c4240648ee8" />
+
+<img width="827" height="713" alt="image" src="https://github.com/user-attachments/assets/d8d0caf7-1f35-48ed-9faa-c463dcbc0a06" />
+
 
 ## ✨ Features
 

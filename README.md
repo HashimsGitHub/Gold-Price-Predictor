@@ -10,6 +10,7 @@ This notebook fetches 10 years of monthly gold spot price data alongside correla
 
 ---
 <img width="1563" height="766" alt="image" src="https://github.com/user-attachments/assets/23867677-20af-43ed-a7bb-3bf1db4b9f71" />
+<img width="908" height="775" alt="image" src="https://github.com/user-attachments/assets/feed0614-9bf3-4127-90f9-0e5c00a65ce0" />
 
 ## ✨ Features
 

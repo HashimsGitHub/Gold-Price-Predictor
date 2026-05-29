@@ -6,9 +6,12 @@ A machine learning pipeline that forecasts gold prices using multi-asset correla
 
 ## 📌 Overview
 
-This notebook fetches 10 years of monthly gold spot price data alongside correlated macro assets (USD Index, S&P 500, Silver) from Yahoo Finance, engineers time-series features, trains an XGBoost regression model, and stores predictions back into Supabase — refreshing actuals on every run for ongoing monitoring.
+This notebook fetches 10 years of monthly gold spot price data alongside correlated macro assets (USD Index, S&P 500, Silver) from Yahoo Finance, engineers time-series lag features, trains both a baseline Random Forest and a GPU-accelerated XGBoost regression model, and stores all predictions back into Supabase — automatically refreshing actuals on every run for ongoing accuracy monitoring.
+
+The pipeline concludes with a 3-month recursive forward forecast and a live accuracy dashboard rendered directly in the notebook.
 
 ---
+
 <img width="1397" height="704" alt="image" src="https://github.com/user-attachments/assets/9da9af46-cf15-44f9-8851-9c4240648ee8" />
 
 <img width="827" height="713" alt="image" src="https://github.com/user-attachments/assets/d8d0caf7-1f35-48ed-9faa-c463dcbc0a06" />
@@ -20,12 +23,13 @@ This notebook fetches 10 years of monthly gold spot price data alongside correla
 |---|---|
 | 📈 10-Year Historical Chart | Monthly gold spot prices visualised over a decade |
 | 🔗 Multi-Asset Correlation | USD Index, S&P 500, and Silver as predictive lag features |
-| ⚡ GPU-Accelerated XGBoost | NVIDIA CUDA training with automatic CPU fallback |
+| ⚡ GPU-Accelerated XGBoost | NVIDIA T4 CUDA training on Google Colab with automatic CPU fallback |
 | 🔄 Stationary Returns Pipeline | Percentage return engineering to eliminate extrapolation bias |
 | 🛠️ Hyperparameter Tuning | Grid Search CV with TimeSeriesSplit to preserve chronological order |
 | 🔮 3-Month Recursive Forecast | Autoregressive forward projection with annotated price targets |
 | 🗄️ Supabase Integration | Live upsert of actuals and predictions on every notebook execution |
 | 🔁 Auto Price Refresh | Latest gold and macro prices pulled from Yahoo Finance on each run |
+| 📊 Accuracy Dashboard | HTML backtest table with historical predictions, today's run, and future forecasts |
 
 ---
 
@@ -33,13 +37,15 @@ This notebook fetches 10 years of monthly gold spot price data alongside correla
 
 | Cell | Pipeline Stage |
 |---|---|
-| 1 | Install libraries, connect to Supabase, initialise DB tables |
-| 2 | Fetch 10-year gold history, upsert to `gold_monthly_prices`, RF baseline model, historical chart |
-| 3 | Multi-asset download (Gold, USD, S&P 500, Silver), XGBoost training, predictions saved to `gold_correlated_macro` |
+| 0 | Environment setup — Colab guard, package installation, GPU/TPU detection, execution timer start |
+| 1 | Import libraries, Supabase connection helper, DB table initialisation |
+| 2 | Fetch 10-year gold history, upsert to `gold_monthly_prices`, Random Forest baseline model, historical chart |
+| 3 | Multi-asset download (Gold, USD Index, S&P 500, Silver), correlation matrix, XGBoost training, predictions saved to `gold_correlated_macro` |
 | 4 | Price refresh — upserts latest actuals into both Supabase tables on every run |
 | 5 | Stationary percentage returns pipeline — reduces non-stationarity bias |
-| 6 | Hyperparameter tuning via Grid Search |
+| 6 | Hyperparameter tuning via Grid Search CV |
 | 7 | 3-month recursive forecast with annotated chart |
+| 8 | Accuracy dashboard — HTML table showing backtest history, today's run, and future forecast rows with total runtime |
 
 ---
 
@@ -49,74 +55,84 @@ This notebook fetches 10 years of monthly gold spot price data alongside correla
 |---|---|
 | `gold_monthly_prices` | Raw monthly gold spot prices (date, price) |
 | `gold_correlated_macro` | Multi-asset prices + XGBoost predicted prices by month |
+| `gold_forecast_log` | Per-run forecast log with predicted vs actual prices for accuracy tracking |
+
+---
+
+## ⏱️ Average Runtime Estimates (T4 GPU)
+
+| Stage | Estimated Time |
+|-------|---------------|
+| Package installation | ~60 seconds |
+| Data ingestion & Supabase sync | ~20 seconds |
+| Random Forest training | ~5 seconds |
+| Multi-asset XGBoost training | ~3 seconds |
+| Hyperparameter grid search | ~3–4 minutes |
+| Full notebook end-to-end | **~4.44 minutes** |
+
+> Runtimes on CPU will be significantly longer, particularly for the grid search cell.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Python** 3.12
+- **Python** 3.x (Google Colab runtime)
 - **XGBoost** — gradient boosted regression with GPU acceleration
 - **Scikit-learn** — model evaluation, Grid Search, TimeSeriesSplit
 - **Pandas / NumPy** — data wrangling and feature engineering
 - **Seaborn / Matplotlib** — visualisations
 - **yfinance** — Yahoo Finance API for market data
 - **psycopg2** — PostgreSQL connection to Supabase
-- **python-dotenv** — secure credential loading from `.env`
-- **PyTorch** — CUDA availability detection for GPU routing
+- **PyTorch** — CUDA availability detection for XGBoost device routing
 
 ---
 
 ## ⚙️ Setup
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/HashimsGitHub/GoldPricePredictor.git
-cd GoldPricePredictor
+### 1. Open in Google Colab
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HashimsGitHub/Gold-Price-Predictor/blob/main/GoldPrice_SupaBase.ipynb)
+
+> ⚠️ This notebook is designed to run **exclusively on Google Colab with a T4 GPU**.
+
+To enable hardware acceleration before running:
+```
+Runtime → Change runtime type → Hardware accelerator → GPU (T4)
 ```
 
-### 2. Create and activate a virtual environment
-```bash
-python3 -m venv venv
-source venv/bin/activate
+### 2. Create a Supabase project
+
+1. Go to [https://supabase.com](https://supabase.com) and sign up for a free account
+2. Click **New Project** and fill in a name, password, and region
+3. Once ready, navigate to:
+   ```
+   Project Settings → Database → Connection string → URI
+   ```
+4. Copy your connection string — it will look like:
+   ```
+   postgresql://postgres:<password>@<host>:<port>/<database>
+   ```
+
+### 3. Store the connection string in Colab Secrets
+
+> **Never paste credentials directly into a notebook cell.** Use Colab Secrets instead.
+
+1. In Colab, click the 🔑 **Secrets** icon in the left sidebar
+2. Click **+ Add new secret**
+3. Set **Name** exactly as:
+   ```
+   DATABASE_URL
+   ```
+4. Paste your full Supabase connection string as the **Value**
+5. Toggle **Notebook access** to **ON**
+
+The notebook reads `DATABASE_URL` automatically on every run — no `.env` file or local configuration needed.
+
+### 4. Run all cells
+
 ```
-
-### 3. Install dependencies
-```bash
-pip install psycopg2-binary pandas numpy scikit-learn seaborn matplotlib \
-            python-dotenv requests yfinance xgboost jupyter ipykernel
+Runtime → Run all
 ```
-
-Install PyTorch with CUDA support (CUDA 12.8 nightly — compatible with driver 581.95+):
-```bash
-pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu128
-```
-
-### 4. Configure environment variables
-
-Create a `.env` file in the project root:
-```
-DATABASE_URL=postgresql://postgres:<password>@<host>:<port>/<database>
-```
-> ⚠️ Never commit this file. It is excluded via `.gitignore`.
-
-### 5. Launch Jupyter
-```bash
-jupyter notebook
-```
-
-Or inside VSCode with WSL Remote — select the `GoldPredictor (venv)` kernel from the top-right kernel picker.
-
----
-
-## 🖥️ Environment
-
-| Component | Detail |
-|---|---|
-| GPU | NVIDIA GeForce RTX 3050 Laptop (4GB VRAM) |
-| CUDA | 13.0 |
-| Driver | 581.95 |
-| OS | WSL2 Ubuntu on Windows |
-| Python | 3.12.3 |
 
 ---
 
@@ -125,11 +141,8 @@ Or inside VSCode with WSL Remote — select the `GoldPredictor (venv)` kernel fr
 ```
 GoldPricePredictor/
 │
-├── GoldPrice_SupaBase.ipynb   # Main notebook
-├── README.md                  # This file
-├── .env                       # Database credentials (not committed)
-├── .gitignore                 # Excludes .env, venv, checkpoints
-└── venv/                      # Virtual environment (not committed)
+├── GoldPrice_SupaBase.ipynb   # Main notebook (run in Google Colab)
+└── README.md                  # This file
 ```
 
 ---
@@ -137,8 +150,9 @@ GoldPricePredictor/
 ## 📝 Notes
 
 - The notebook is designed to be **re-run monthly** — each execution refreshes the latest gold and macro prices in Supabase automatically
-- XGBoost detects CUDA at runtime and switches to GPU training automatically; falls back to CPU (`device="hist"`) if unavailable
+- XGBoost detects CUDA at runtime and switches to GPU training automatically; falls back to CPU (`device="cpu"`) if no GPU is available
 - All time-series splits are **chronological** (no shuffle) to prevent data leakage from future prices into training
+- The accuracy dashboard backfills prior forecast rows with real prices as each month closes, enabling ongoing model monitoring
 
 ---
 

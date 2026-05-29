@@ -1,0 +1,46 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Runs every Sunday at 00:00 UTC (adjust as needed)
+    # Supabase pauses after 7 days of inactivity, so weekly is enough
+    - cron: '0 0 * * 0'
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  keep-alive:
+    name: Ping Supabase database
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send keep-alive query
+        run: |
+          response=$(curl --silent --show-error --fail \
+            --request POST \
+            --url "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/ping_keepalive" \
+            --header "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --header "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --header "Content-Type: application/json" \
+            --data '{}' \
+            --write-out "\nHTTP_STATUS:%{http_code}" \
+            2>&1)
+
+          http_status=$(echo "$response" | grep "HTTP_STATUS:" | cut -d: -f2)
+          echo "Response: $response"
+          echo "HTTP Status: $http_status"
+
+          if [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ]; then
+            echo "✅ Supabase keep-alive ping successful"
+          else
+            echo "❌ Ping failed with status $http_status"
+            exit 1
+          fi
+
+      # Fallback: if you don't have a custom RPC function,
+      # this pings the health endpoint instead (uncomment to use)
+      # - name: Health check fallback
+      #   run: |
+      #     curl --silent --fail \
+      #       "${{ secrets.SUPABASE_URL }}/rest/v1/?apikey=${{ secrets.SUPABASE_ANON_KEY }}" \
+      #       -o /dev/null
+      #     echo "✅ Health check passed"
